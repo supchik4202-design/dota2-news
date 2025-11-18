@@ -39,11 +39,14 @@ jobs:
           echo "⚠️ last_post.json не создан (новых новостей нет)"
         fi
         
-    - name: Commit and push if file exists
+   - name: Commit and push if file exists
       if: steps.check_file.outputs.file_exists == 'true'
+      env:
+        PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add last_post.json
         git commit -m "Update last post record"
-        git push
+        # Используем PAT для пуша
+        git push https://x-access-token:${PAT_TOKEN}@github.com/${{ github.repository }}.git main
