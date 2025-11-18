@@ -24,29 +24,14 @@ jobs:
     - name: Run news checker
       env:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      run: |
-        echo "Запускаем news_checker.py..."
-        python news_checker.py || echo "Script completed (with or without new news)"
+      run: python news_checker.py
         
-    - name: Check if last_post.json exists
-      id: check_file
+    - name: Show status
       run: |
         if [ -f "last_post.json" ]; then
-          echo "file_exists=true" >> $GITHUB_OUTPUT
-          echo "✅ last_post.json найден"
+          echo "✅ last_post.json обновлен (новые новости найдены)"
+          echo "=== Содержимое last_post.json ==="
+          cat last_post.json
         else
-          echo "file_exists=false" >> $GITHUB_OUTPUT
-          echo "⚠️ last_post.json не создан (новых новостей нет)"
+          echo "ℹ️ Новых новостей не найдено"
         fi
-        
-   - name: Commit and push if file exists
-      if: steps.check_file.outputs.file_exists == 'true'
-      env:
-        PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
-      run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add last_post.json
-        git commit -m "Update last post record"
-        # Используем PAT для пуша
-        git push https://x-access-token:${PAT_TOKEN}@github.com/${{ github.repository }}.git main
