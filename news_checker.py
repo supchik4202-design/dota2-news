@@ -10,26 +10,32 @@ RSS_URLS = [
     "https://steamcommunity.com/games/570/rss/"
 ]
 
+# Вместо файла используем память (для одного запуска)
+sent_links_this_run = set()
+
 def load_last_posts():
+    """Загружаем историю из файла, но не полагаемся на нее полностью"""
     try:
         with open('last_post.json', 'r', encoding='utf-8') as f:
-            return json.load(f)
+            data = json.load(f)
+            print(f"📖 Загружено {len(data)} записей из last_post.json")
+            return data
     except:
-        print("ℹ️ Файл last_post.json не найден, создаем новый")
+        print("ℹ️ Файл last_post.json не найден или пуст")
         return {}
 
 def save_last_posts(posts):
+    """Сохраняем в файл (но не коммитим)"""
     try:
         with open('last_post.json', 'w', encoding='utf-8') as f:
             json.dump(posts, f, ensure_ascii=False, indent=2)
-        print("💾 Файл last_post.json сохранен")
+        print(f"💾 Сохранено {len(posts)} записей в last_post.json")
         return True
     except Exception as e:
-        print(f"❌ Ошибка сохранения файла: {e}")
+        print(f"❌ Ошибка сохранения: {e}")
         return False
 
 def send_to_discord(title, link, description, source):
-    # Проверяем наличие вебхука
     if not WEBHOOK_URL:
         print("❌ DISCORD_WEBHOOK не настроен")
         return False
@@ -81,7 +87,12 @@ def check_rss_feed(url, source_name, last_posts):
         latest = feed.entries[0]
         feed_key = f"{source_name}_{latest.link}"
         
-        # Проверяем, не отправляли ли уже эту новость
+        # Проверяем в памяти этого запуска
+        if latest.link in sent_links_this_run:
+            print(f"✅ Новость уже отправлена в этом запуске: {latest.title}")
+            return False
+            
+        # Проверяем в сохраненной истории
         if last_posts.get(feed_key) == latest.link:
             print(f"✅ Новостей нет в {source_name}")
             return False
@@ -90,7 +101,9 @@ def check_rss_feed(url, source_name, last_posts):
         
         # Отправляем в Discord
         if send_to_discord(latest.title, latest.link, latest.summary, source_name):
-            # Сохраняем информацию о последней новости
+            # Сохраняем в память этого запуска
+            sent_links_this_run.add(latest.link)
+            # Обновляем историю
             last_posts[feed_key] = latest.link
             print(f"✅ Отправлено в Discord: {latest.title}")
             return True
@@ -102,19 +115,9 @@ def check_rss_feed(url, source_name, last_posts):
         print(f"❌ Ошибка при проверке {source_name}: {e}")
         return False
 
-def create_initial_last_post():
-    """Создает начальный файл last_post.json если его нет"""
-    if not os.path.exists('last_post.json'):
-        initial_data = {"initial": "start"}
-        save_last_posts(initial_data)
-        print("📄 Создан начальный файл last_post.json")
-
 if __name__ == "__main__":
     print("🚀 Запуск проверки новостей Dota 2...")
     print(f"📝 DISCORD_WEBHOOK: {'✅ Настроен' if WEBHOOK_URL else '❌ Не настроен'}")
-    
-    # Создаем начальный файл если его нет
-    create_initial_last_post()
     
     last_posts = load_last_posts()
     new_news_found = False
@@ -129,10 +132,10 @@ if __name__ == "__main__":
     
     if new_news_found:
         if save_last_posts(last_posts):
-            print("💾 Данные о последних новостях сохранены")
+            print("💾 Данные о последних новостях сохранены (локально)")
         else:
             print("❌ Не удалось сохранить данные")
     else:
         print("ℹ️ Новых новостей не найдено")
-        # Все равно сохраняем текущее состояние (на случай первой инициализации)
-        save_last_posts(last_posts)
+    
+    print(f"📊 Итог: найдено {len(sent_links_this_run)} новых новостей")
